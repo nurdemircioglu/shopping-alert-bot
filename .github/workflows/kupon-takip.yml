@@ -1,10 +1,9 @@
 name: Kupon takip
 
 on:
-  # Zamanlama, GitHub'dan veri okunabildiği doğrulanana kadar kapalı. Açmak için aşağıdaki # işaretlerini kaldır.
-  # schedule:
-  #   - cron: '*/15 * * * *'   # 15 dakikada bir mağazaları gez (GitHub birkaç dakika geciktirebilir)
-  #   - cron: '5 5 * * *'      # her sabah 08:05 (TR): ek olarak "en yeniler" + "çok satanlar" listeleri
+  schedule:
+    - cron: '*/15 * * * *'   # 15 dakikada bir mağazaları gez (GitHub birkaç dakika geciktirebilir)
+    - cron: '5 5 * * *'      # her sabah 08:05 (TR): ek olarak "en yeniler" + "çok satanlar" listeleri
   workflow_dispatch:
     inputs:
       listeler:

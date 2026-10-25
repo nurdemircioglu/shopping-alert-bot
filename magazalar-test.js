@@ -138,7 +138,19 @@ function kuponlariOzetle(coupon) {
       // Türkiye'yi seç, seçim çerezde kalır; sonra mağaza sayfasını yeniden aç
       if (page.url().includes('select-country')) {
         console.log('Ülke seçme sayfası → Türkiye seçiliyor');
-        await page.getByText('Türkiye', { exact: true }).first().click();
+        // Çerez bandı ülke seçimini engelliyor: zorunlu olmayan çerezleri reddet
+        const reddet = page.getByRole('button', { name: 'Tümünü Reddet' });
+        if (await reddet.isVisible().catch(() => false)) { await reddet.click(); await page.waitForTimeout(1000); }
+        const kutu = page.locator('#m-country-selection');
+        const yerelSecim = kutu.locator('select');
+        if (await yerelSecim.count()) await yerelSecim.first().selectOption({ label: 'Türkiye' });
+        else {
+          await kutu.getByText('Select your country').first().click();
+          await page.waitForTimeout(800);
+          await kutu.getByText('Türkiye', { exact: true }).last().click();
+        }
+        await page.waitForTimeout(800);
+        await kutu.getByRole('button', { name: /^(Select|Seç)$/ }).first().click();
         await page.waitForLoadState('domcontentloaded').catch(() => {});
         await page.waitForTimeout(3000);
         resp = await page.goto(m.url, { waitUntil: 'domcontentloaded', timeout: 45000 });

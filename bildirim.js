@@ -15,6 +15,7 @@ async function gonder(chatId, yontem, alanlar, dosyaAlani, dosya) {
   if (dosya) form.append(dosyaAlani, new Blob([fs.readFileSync(dosya)]), path.basename(dosya));
   const r = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${yontem}`, { method: 'POST', body: form });
   if (!r.ok) console.log('Telegram hatası:', r.status, (await r.text()).slice(0, 200));
+  return r.ok;
 }
 
 async function bildir(olaylar) {
@@ -46,3 +47,4 @@ async function bildir(olaylar) {
 }
 
 module.exports = bildir;
+module.exports.gonder = gonder;

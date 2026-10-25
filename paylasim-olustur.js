@@ -147,3 +147,5 @@ async function olustur() {
 
 module.exports = olustur;
 if (require.main === module) olustur().catch(e => { console.error('HATA:', e.message); process.exit(1); });
+module.exports.storyHtml = storyHtml;
+module.exports.metin = metin;

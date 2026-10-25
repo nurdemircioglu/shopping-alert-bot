@@ -14,6 +14,10 @@ on:
         description: 'Yalnız bu mağazaları dene (ör. Koton,Mango). Geçmişe ve sayfaya dokunmaz.'
         type: string
         default: ''
+      deneme:
+        description: 'Telegram biçimini görmek için DENEME mesajı gönder (yalnız Koton okunur)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -59,7 +63,9 @@ jobs:
           FLAG=""
           if [ "${{ github.event.schedule }}" = "5 5 * * *" ] || [ "${{ inputs.listeler }}" = "true" ]; then FLAG="--listeler"; fi
           if [ -n "${{ inputs.sadece }}" ]; then FLAG="$FLAG --sadece=${{ inputs.sadece }}"; fi
+          if [ "${{ inputs.deneme }}" = "true" ]; then FLAG="--sadece=Koton"; fi
           xvfb-run -a node magazalar-test.js --headful $FLAG
+          if [ "${{ inputs.deneme }}" = "true" ]; then node deneme-bildirim.js; fi
       # Teşhis: ekran görüntüleri ve verisi okunamayan sayfaların HTML'i (3 gün saklanır)
       - uses: actions/upload-artifact@v4
         if: always()
@@ -72,7 +78,7 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
       - uses: actions/cache/save@v4
-        if: always() && hashFiles('gecmis.json') != '' && inputs.sadece == ''
+        if: always() && hashFiles('gecmis.json') != '' && inputs.sadece == '' && inputs.deneme != true
         with:
           path: |
             gecmis.json
@@ -80,13 +86,13 @@ jobs:
             magazalar/*-cok-satanlar.json
           key: gecmis-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
-        if: inputs.sadece == ''
+        if: inputs.sadece == '' && inputs.deneme != true
         with:
           path: site
 
   yayinla:
     needs: topla
-    if: inputs.sadece == ''
+    if: inputs.sadece == '' && inputs.deneme != true
     runs-on: ubuntu-latest
     environment:
       name: github-pages

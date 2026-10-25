@@ -132,9 +132,21 @@ function kuponlariOzetle(coupon) {
     console.log(`\n=== ${m.ad} ===`);
     const kayit = { magaza: m.ad, url: m.url };
     try {
-      const resp = await page.goto(m.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      let resp = await page.goto(m.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForTimeout(3000);
+      // Yurt dışından (ör. GitHub sunucuları) açılınca Trendyol ülke seçme sayfasına yönlendiriyor:
+      // Türkiye'yi seç, seçim çerezde kalır; sonra mağaza sayfasını yeniden aç
+      if (page.url().includes('select-country')) {
+        console.log('Ülke seçme sayfası → Türkiye seçiliyor');
+        await page.getByText('Türkiye', { exact: true }).first().click();
+        await page.waitForLoadState('domcontentloaded').catch(() => {});
+        await page.waitForTimeout(3000);
+        resp = await page.goto(m.url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        await page.waitForTimeout(3000);
+        if (page.url().includes('select-country')) console.log('UYARI: Türkiye seçimi tutmadı');
+      }
       kayit.status = resp && resp.status();
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
       const text = await page.evaluate(() => document.body.innerText);
       if (kayit.status === 403 || /captcha|robot olmadığınızı|you have been blocked|access denied/i.test(text)) {
         console.log('ENGEL görüldü, duruyorum. status:', kayit.status);

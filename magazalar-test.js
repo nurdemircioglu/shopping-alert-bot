@@ -9,7 +9,10 @@ const { urunleriTopla } = require('./urunler');
 const TUMU = JSON.parse(fs.readFileSync(__dirname + '/magazalar.json', 'utf8'));
 // --sadece=Kremi,Missha: yalnız bu mağazaları dene; geçmişe, rapora ve paylaşımlara dokunmaz
 const sadece = (process.argv.find(a => a.startsWith('--sadece=')) || '').slice(9).split(',').filter(Boolean);
-const MAGAZALAR = sadece.length ? TUMU.filter(m => sadece.includes(m.ad)) : TUMU;
+// --yalniz=Koton: yalnız bu mağazaları gez ama normal çalışma gibi kaydet ve bildir (Mac'teki 10 dk'lık iş)
+const yalniz = (process.argv.find(a => a.startsWith('--yalniz=')) || '').slice(9).split(',').filter(Boolean);
+const secili = sadece.length ? sadece : yalniz;
+const MAGAZALAR = secili.length ? TUMU.filter(m => secili.includes(m.ad)) : TUMU;
 const headful = process.argv.includes('--headful');
 // --listeler: her mağaza için "en yeniler" ve "çok satanlar" listelerini de aç (mağaza başına +2 sayfa).
 // Günde 1-2 kez yeterli; her 30 dakikada açmak engellenme riskini artırır.
@@ -128,7 +131,7 @@ function kuponlariOzetle(coupon) {
   const sonuc = [];
 
   for (const [i, m] of MAGAZALAR.entries()) {
-    if (i > 0) await bekle(10000 + Math.random() * 5000);
+    if (i > 0) await bekle(8000 + Math.random() * 4000);
     console.log(`\n=== ${m.ad} ===`);
     const kayit = { magaza: m.ad, url: m.url };
     try {

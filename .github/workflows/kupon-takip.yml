@@ -39,10 +39,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Tarayıcı ve yazı tipleri
+      # Tarayıcı: GitHub makinelerinde hazır kurulu Google Chrome kullanılıyor (Playwright indirmesi yok)
+      - name: Emoji yazı tipi
         run: |
-          npx playwright install --with-deps chromium
-          sudo apt-get install -y -qq fonts-noto-color-emoji fonts-noto-core > /dev/null
+          mkdir -p ~/.fonts
+          curl -sSL -o ~/.fonts/NotoColorEmoji.ttf https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf
+          fc-cache -f > /dev/null
+          google-chrome --version
       # Önceki çalışmadan kalanlar: görülen/bildirilen kodlar ve sabah toplanan listeler
       - uses: actions/cache/restore@v4
         with:

@@ -16,7 +16,7 @@ const { gonder } = require('./bildirim');
   const f = { ...k, tur: 'kod', magaza: m.magaza, url: m.url, olay: 'son-saatler' };
 
   const dosya = path.join(__dirname, 'deneme-story.png');
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch());
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   await page.setContent(storyHtml({ rozet: 'DENEME', baslik: 'Son saatler,<br>kaçırma!', satirlar: [f], alt: 'Takipte kal, fırsatları ilk sen gör 🔔' }));
   await page.screenshot({ path: dosya });

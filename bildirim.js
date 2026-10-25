@@ -8,13 +8,36 @@ const path = require('path');
 const OUT = path.join(__dirname, 'paylasim');
 const MARKA = 'Shopping Alert';
 
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const tl = n => n == null ? '' : Number(n).toLocaleString('tr-TR') + ' TL';
+
+// Telegram açıklaması (parse_mode HTML). Kod <code> içinde: Telegram'da dokununca kopyalanır.
+function aciklama(o) {
+  const { kalanYazi } = require('./paylasim-olustur');
+  const ne = { kod: 'indirim kodu', kupon: 'kupon', kampanya: 'kampanya' }[o.tur] || o.tur;
+  const satirlar = [`🆕 <b>${esc(o.magaza)}</b> · yeni ${ne}!`];
+  if (o.tur === 'kampanya') {
+    satirlar.push(`🏷️ ${esc(o.ad)}`, `💸 ${esc(o.indirim)}${o.kosul ? ` · ${esc(o.kosul)}` : ''}`);
+  } else {
+    satirlar.push(`💸 ${esc(o.indirim)} indirim · ${esc(tl(o.altLimit))} ve üzeri`);
+    if (o.tur === 'kod') satirlar.push(`🔑 Kod: <code>${esc(o.kod)}</code>  (dokun, kopyalansın)`);
+    else satirlar.push('👉 Mağaza sayfasında kupona “Kazan” de');
+  }
+  const kalan = o.tur === 'kod' && o.kalan != null ? `📦 ${Number(o.kalan).toLocaleString('tr-TR')} adet kaldı · ` : '';
+  satirlar.push(`${kalan}⏳ ${esc(kalanYazi(o.bitis))}`);
+  if (o.url) satirlar.push(`🛍️ ${esc(o.url.split('?')[0])}`);
+  return satirlar.join('\n');
+}
+
 async function gonder(chatId, yontem, alanlar, dosyaAlani, dosya) {
   const form = new FormData();
   form.append('chat_id', chatId);
+  form.append('parse_mode', 'HTML');
   for (const [k, v] of Object.entries(alanlar)) form.append(k, v);
   if (dosya) form.append(dosyaAlani, new Blob([fs.readFileSync(dosya)]), path.basename(dosya));
   const r = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${yontem}`, { method: 'POST', body: form });
-  if (!r.ok) console.log('Telegram hatası:', r.status, (await r.text()).slice(0, 200));
+  await new Promise(res => setTimeout(res, 1100));   // Telegram sınırı: ~1 mesaj/sn
+  if (!r.ok) console.log(`Telegram hatası (${chatId}):`, r.status, (await r.text()).slice(0, 200));
   return r.ok;
 }
 
@@ -26,8 +49,7 @@ async function bildir(olaylar) {
   if (kanal) {
     for (const [i, f] of gorseller.entries()) {
       const o = olaylar[i];
-      const url = o && o.url ? `\n🛍️ ${o.url.split('?')[0]}` : '';
-      await gonder(kanal, 'sendPhoto', { caption: `${(o && o.metin) || ''}${url}\n\n🔔 ${MARKA}` }, 'photo', path.join(OUT, f));
+      await gonder(kanal, 'sendPhoto', { caption: `${o ? aciklama(o) : ''}\n\n🔔 ${MARKA}` }, 'photo', path.join(OUT, f));
     }
   }
 
@@ -35,12 +57,12 @@ async function bildir(olaylar) {
     const site = process.env.SITE_URL ? `\n📲 Tüm paylaşımlar: ${process.env.SITE_URL}paylasim.html` : '';
     await gonder(yonetici, 'sendMessage', { text: `🔔 ${olaylar.length} yeni fırsat${kanal ? ' (kanala da gönderildi)' : ''}${site}` });
     for (const [i, f] of gorseller.entries()) {
-      await gonder(yonetici, 'sendPhoto', { caption: (olaylar[i] && olaylar[i].metin) || '' }, 'photo', path.join(OUT, f));
+      await gonder(yonetici, 'sendPhoto', { caption: olaylar[i] ? aciklama(olaylar[i]) : '' }, 'photo', path.join(OUT, f));
     }
     const reel = path.join(OUT, 'reel.mp4');
     if (fs.existsSync(reel)) {
-      const aciklama = fs.existsSync(path.join(OUT, 'reel-aciklama.txt')) ? fs.readFileSync(path.join(OUT, 'reel-aciklama.txt'), 'utf8') : '';
-      await gonder(yonetici, 'sendVideo', { caption: aciklama.slice(0, 1000) }, 'video', reel);
+      const reelMetni = fs.existsSync(path.join(OUT, 'reel-aciklama.txt')) ? fs.readFileSync(path.join(OUT, 'reel-aciklama.txt'), 'utf8') : '';
+      await gonder(yonetici, 'sendVideo', { caption: esc(reelMetni.slice(0, 1000)) }, 'video', reel);
     }
   }
   console.log('Telegram: bildirim gönderildi');
@@ -48,3 +70,4 @@ async function bildir(olaylar) {
 
 module.exports = bildir;
 module.exports.gonder = gonder;
+module.exports.aciklama = aciklama;

@@ -92,7 +92,7 @@ async function olustur() {
   const sure = GIRIS + kartlar.length * KART + CIKIS;
   const toplamKare = Math.round(sure * FPS);
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch());
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   await page.setContent(html(kartlar));
   await page.evaluate(() => document.getAnimations().forEach(a => a.pause()));

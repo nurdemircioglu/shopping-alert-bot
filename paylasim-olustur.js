@@ -9,8 +9,6 @@ const { veriTopla } = require('./rapor-olustur');
 const DIR = __dirname;
 const OUT = path.join(DIR, 'paylasim');
 const GECMIS = path.join(DIR, 'gecmis.json');
-const AZ_KALDI = 0.15;          // stokun %15'inden azı kaldıysa "tükeniyor"
-const SON_SAATLER = 6 * 36e5;   // 6 saatten az kaldıysa "son saatler"
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const tl = n => n == null ? '' : Number(n).toLocaleString('tr-TR') + ' TL';
@@ -33,26 +31,18 @@ function firsatlar(veri) {
   return out;
 }
 
-// Her fırsat için her olay bir kez bildirilir (gecmis.json'daki "bildirilen" listesi).
-// Bir mağaza ilk kez okunuyorsa (oncekiVerili'de yoksa) mevcut fırsatları kaydedilir ama bildirilmez.
-function degisiklikler(simdi, onceki, oncekiVerili) {
+// Her fırsat yalnız bir kez, ilk görüldüğünde bildirilir (gecmis.json'daki "bildirilen" listesi).
+// Bir mağaza ilk kez okunduğunda da o an geçerli tüm kodları/kampanyaları bir kez gönderir.
+// Bir çalışmada sayfada görünmeyen ama süresi bitmemiş fırsatlar unutulmaz; geri gelince tekrar gönderilmez.
+function degisiklikler(simdi, onceki) {
   const once = new Map(onceki.map(f => [f.anahtar, f]));
   const olaylar = [];
   for (const f of simdi) {
     const o = once.get(f.anahtar);
-    const ilkCalisma = !oncekiVerili.has(f.magaza);
     f.bildirilen = o ? [...(o.bildirilen || [])] : [];
-    const kosullar = {
-      yeni: !o && !ilkCalisma,
-      tukeniyor: f.tur === 'kod' && f.toplam && f.kalan / f.toplam < AZ_KALDI,
-      'son-saatler': f.bitis && bitisMs(f.bitis) - Date.now() > 0 && bitisMs(f.bitis) - Date.now() < SON_SAATLER,
-    };
-    for (const [olay, olur] of Object.entries(kosullar)) {
-      if (!olur || f.bildirilen.includes(olay)) continue;
-      f.bildirilen.push(olay);
-      // İlk çalışmada mevcut durumu kaydet ama bildirim üretme
-      if (!ilkCalisma) { olaylar.push({ olay, ...f }); break; }
-    }
+    if (f.bildirilen.includes('yeni') || (f.bitis && bitisMs(f.bitis) <= Date.now())) continue;
+    f.bildirilen.push('yeni');
+    olaylar.push({ olay: 'yeni', ...f });
   }
   return olaylar;
 }
@@ -99,17 +89,18 @@ async function olustur() {
   try { onceki = JSON.parse(fs.readFileSync(GECMIS, 'utf8')); } catch {}
   const oncekiListe = Array.isArray(onceki) ? onceki : ((onceki && onceki.firsatlar) || []);
   const oncekiVerili = new Set(Array.isArray(onceki) ? oncekiListe.map(f => f.magaza) : ((onceki && onceki.verili) || []));
-  const ilkCalisma = !oncekiVerili.size;
   const simdi = firsatlar(veri).filter(f => verili.has(f.magaza));
-  const olaylar = degisiklikler(simdi, oncekiListe, oncekiVerili);
+  const olaylar = degisiklikler(simdi, oncekiListe);
+  const simdiAnahtar = new Set(simdi.map(f => f.anahtar));
   fs.writeFileSync(GECMIS, JSON.stringify({
     verili: [...new Set([...oncekiVerili, ...verili])],
-    firsatlar: [...simdi, ...oncekiListe.filter(f => !verili.has(f.magaza))],
+    firsatlar: [...simdi, ...oncekiListe.filter(f => !verili.has(f.magaza)
+      || (!simdiAnahtar.has(f.anahtar) && f.bitis && bitisMs(f.bitis) > Date.now()))],
   }, null, 2));
   if (!verili.size) console.log('UYARI: hiçbir mağazadan veri okunamadı, geçmiş korundu');
 
   for (const f of fs.readdirSync(OUT)) fs.unlinkSync(path.join(OUT, f));
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch());
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   const ciz = async (dosya, opts) => {
     await page.setContent(storyHtml(opts));
@@ -132,7 +123,6 @@ async function olustur() {
   const hashtag = '#trendyol #indirimkodu #kupon #efsanekasım #indirim #fırsat';
   const satirlar = [
     `Güncelleme: ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`,
-    ilkCalisma ? '(İlk çalışma: değişiklikleri bir sonraki çalışmadan itibaren yakalarım.)' : '',
     '', '== DEĞİŞİKLİKLER ==', ...(olaylar.length ? olaylar.map(metin) : ['Yeni bir şey yok.']),
     '', '== GÜNÜN ÖZETİ (açıklama metni) ==',
     '🔥 Bugün geçerli Trendyol indirim kodları:',
@@ -149,3 +139,4 @@ module.exports = olustur;
 if (require.main === module) olustur().catch(e => { console.error('HATA:', e.message); process.exit(1); });
 module.exports.storyHtml = storyHtml;
 module.exports.metin = metin;
+module.exports.kalanYazi = kalanYazi;

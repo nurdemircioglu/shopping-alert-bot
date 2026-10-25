@@ -121,7 +121,7 @@ function sepetHtml({ magaza, sepet, kod }) {
 async function olustur() {
   const veri = veriTopla();
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: 'chrome' }).catch(() => chromium.launch());
   const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
   const uretilen = [];
   const ciz = async (dosya, html, urunler) => {

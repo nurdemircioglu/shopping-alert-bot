@@ -1,0 +1,18 @@
+node_modules/
+# Her çalışmada yeniden üretilenler
+site/
+paylasim/
+magazalar/
+listeler/
+gecmis.json
+rapor.html
+magazalar-sonuc.json
+kuponlar.json
+kupon-endpointleri.json
+# Keşif / test artıkları
+fetch-sonuc.html
+sayfa-tam.html
+kupon-bolumu.html
+*.png
+magazalar-deneme.json
+.DS_Store

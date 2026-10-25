@@ -1,0 +1,78 @@
+name: Kupon takip
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # 15 dakikada bir mağazaları gez (GitHub birkaç dakika geciktirebilir)
+    - cron: '5 5 * * *'      # her sabah 08:05 (TR): ek olarak "en yeniler" + "çok satanlar" listeleri
+  workflow_dispatch:
+    inputs:
+      listeler:
+        description: 'En yeniler / çok satanlar listelerini de topla'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kupon-takip
+  cancel-in-progress: false
+
+jobs:
+  topla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Tarayıcı ve yazı tipleri
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y -qq fonts-noto-color-emoji fonts-noto-core > /dev/null
+      # Önceki çalışmadan kalanlar: görülen/bildirilen kodlar ve sabah toplanan listeler
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            gecmis.json
+            magazalar/*-en-yeniler.json
+            magazalar/*-cok-satanlar.json
+          key: gecmis-${{ github.run_id }}
+          restore-keys: gecmis-
+      # Görünür tarayıcı gerekiyor (headless Cloudflare'a takılabilir): sanal ekranda çalıştır
+      - name: Mağazaları gez
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_KANAL_ID: ${{ secrets.TELEGRAM_KANAL_ID }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: |
+          FLAG=""
+          if [ "${{ github.event.schedule }}" = "5 5 * * *" ] || [ "${{ inputs.listeler }}" = "true" ]; then FLAG="--listeler"; fi
+          xvfb-run -a node magazalar-test.js --headful $FLAG
+      - uses: actions/cache/save@v4
+        if: always() && hashFiles('gecmis.json') != ''
+        with:
+          path: |
+            gecmis.json
+            magazalar/*-en-yeniler.json
+            magazalar/*-cok-satanlar.json
+          key: gecmis-${{ github.run_id }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  yayinla:
+    needs: topla
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

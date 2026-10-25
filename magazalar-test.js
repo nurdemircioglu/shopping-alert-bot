@@ -124,7 +124,7 @@ function kuponlariOzetle(coupon) {
   let browser;
   try { browser = await chromium.launch({ channel: 'chrome', headless: !headful }); }
   catch { browser = await chromium.launch({ headless: !headful }); }
-  const page = await (await browser.newContext({ locale: 'tr-TR' })).newPage();
+  const page = await (await browser.newContext({ locale: 'tr-TR', timezoneId: 'Europe/Istanbul' })).newPage();
   const sonuc = [];
 
   for (const [i, m] of MAGAZALAR.entries()) {
@@ -180,7 +180,11 @@ function kuponlariOzetle(coupon) {
         }
       }
       fs.writeFileSync(`${OUT}/${slug(m.ad)}-state.json`, JSON.stringify(state, null, 2));
-      if (!state) fs.writeFileSync(`${OUT}/${slug(m.ad)}-sayfa.html`, await page.content());
+      if (!state) {
+        fs.writeFileSync(`${OUT}/${slug(m.ad)}-sayfa.html`, await page.content());
+        const ozet = await page.evaluate(() => ({ url: location.href, baslik: document.title, metin: document.body.innerText.replace(/\s+/g, ' ').slice(0, 400) }));
+        console.log('VERİ YOK → gerçek adres:', ozet.url, '| başlık:', ozet.baslik, '\n  sayfa metni:', ozet.metin);
+      }
       await page.screenshot({ path: `${OUT}/${slug(m.ad)}.png` });
 
       console.log('status:', kayit.status, '| state:', kayit.stateKaynak || 'BULUNAMADI');

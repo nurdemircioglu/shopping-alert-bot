@@ -32,7 +32,8 @@ function veriTopla() {
         : p.selectionConditionOver === 'QUANTITY' ? `${p.selectionConditionOverValue} adet ve üzeri`
         : p.selectionConditionOver === 'AMOUNT' ? `${tl(p.selectionConditionOverValue)} ve üzeri` : '',
     }));
-    return { ad: m.magaza, url: m.url, status: m.status, hata: m.hata || (m.engel ? 'Engel görüldü' : null), kodlar, kuponlar, kampanyalar };
+    return { ad: m.magaza, url: m.url, status: m.status, veriVar: !!state,
+      hata: m.hata || (m.engel ? 'Engel görüldü' : !state ? 'Bu çalışmada veri okunamadı' : null), kodlar, kuponlar, kampanyalar };
   });
   return { guncelleme, magazalar };
 }

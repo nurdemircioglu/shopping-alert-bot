@@ -33,12 +33,14 @@ function firsatlar(veri) {
   return out;
 }
 
-// Her fırsat için her olay bir kez bildirilir (gecmis.json'daki "bildirilen" listesi)
-function degisiklikler(simdi, onceki, ilkCalisma) {
+// Her fırsat için her olay bir kez bildirilir (gecmis.json'daki "bildirilen" listesi).
+// Bir mağaza ilk kez okunuyorsa (oncekiVerili'de yoksa) mevcut fırsatları kaydedilir ama bildirilmez.
+function degisiklikler(simdi, onceki, oncekiVerili) {
   const once = new Map(onceki.map(f => [f.anahtar, f]));
   const olaylar = [];
   for (const f of simdi) {
     const o = once.get(f.anahtar);
+    const ilkCalisma = !oncekiVerili.has(f.magaza);
     f.bildirilen = o ? [...(o.bildirilen || [])] : [];
     const kosullar = {
       yeni: !o && !ilkCalisma,
@@ -91,12 +93,20 @@ function metin(f) {
 async function olustur() {
   fs.mkdirSync(OUT, { recursive: true });
   const veri = veriTopla();
-  const simdi = firsatlar(veri);
+  // Yalnız bu çalışmada verisi gerçekten okunan mağazalar karşılaştırılır; okunamayanların eski kaydı korunur
+  const verili = new Set(veri.magazalar.filter(m => m.veriVar).map(m => m.ad));
   let onceki = null;
   try { onceki = JSON.parse(fs.readFileSync(GECMIS, 'utf8')); } catch {}
-  const ilkCalisma = !onceki;
-  const olaylar = degisiklikler(simdi, onceki || [], ilkCalisma);
-  fs.writeFileSync(GECMIS, JSON.stringify(simdi, null, 2));
+  const oncekiListe = Array.isArray(onceki) ? onceki : ((onceki && onceki.firsatlar) || []);
+  const oncekiVerili = new Set(Array.isArray(onceki) ? oncekiListe.map(f => f.magaza) : ((onceki && onceki.verili) || []));
+  const ilkCalisma = !oncekiVerili.size;
+  const simdi = firsatlar(veri).filter(f => verili.has(f.magaza));
+  const olaylar = degisiklikler(simdi, oncekiListe, oncekiVerili);
+  fs.writeFileSync(GECMIS, JSON.stringify({
+    verili: [...new Set([...oncekiVerili, ...verili])],
+    firsatlar: [...simdi, ...oncekiListe.filter(f => !verili.has(f.magaza))],
+  }, null, 2));
+  if (!verili.size) console.log('UYARI: hiçbir mağazadan veri okunamadı, geçmiş korundu');
 
   for (const f of fs.readdirSync(OUT)) fs.unlinkSync(path.join(OUT, f));
   const browser = await chromium.launch();

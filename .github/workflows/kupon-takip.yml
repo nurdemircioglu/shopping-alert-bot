@@ -1,15 +1,20 @@
 name: Kupon takip
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'   # 15 dakikada bir mağazaları gez (GitHub birkaç dakika geciktirebilir)
-    - cron: '5 5 * * *'      # her sabah 08:05 (TR): ek olarak "en yeniler" + "çok satanlar" listeleri
+  # Zamanlama, GitHub'dan veri okunabildiği doğrulanana kadar kapalı. Açmak için aşağıdaki # işaretlerini kaldır.
+  # schedule:
+  #   - cron: '*/15 * * * *'   # 15 dakikada bir mağazaları gez (GitHub birkaç dakika geciktirebilir)
+  #   - cron: '5 5 * * *'      # her sabah 08:05 (TR): ek olarak "en yeniler" + "çok satanlar" listeleri
   workflow_dispatch:
     inputs:
       listeler:
         description: 'En yeniler / çok satanlar listelerini de topla'
         type: boolean
         default: false
+      sadece:
+        description: 'Yalnız bu mağazaları dene (ör. Koton,Mango). Geçmişe ve sayfaya dokunmaz.'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -54,9 +59,21 @@ jobs:
         run: |
           FLAG=""
           if [ "${{ github.event.schedule }}" = "5 5 * * *" ] || [ "${{ inputs.listeler }}" = "true" ]; then FLAG="--listeler"; fi
+          if [ -n "${{ inputs.sadece }}" ]; then FLAG="$FLAG --sadece=${{ inputs.sadece }}"; fi
           xvfb-run -a node magazalar-test.js --headful $FLAG
+      # Teşhis: ekran görüntüleri ve verisi okunamayan sayfaların HTML'i (3 gün saklanır)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: teshis
+          path: |
+            magazalar/*.png
+            magazalar/*-sayfa.html
+            magazalar-deneme.json
+          retention-days: 3
+          if-no-files-found: ignore
       - uses: actions/cache/save@v4
-        if: always() && hashFiles('gecmis.json') != ''
+        if: always() && hashFiles('gecmis.json') != '' && inputs.sadece == ''
         with:
           path: |
             gecmis.json
@@ -64,11 +81,13 @@ jobs:
             magazalar/*-cok-satanlar.json
           key: gecmis-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
+        if: inputs.sadece == ''
         with:
           path: site
 
   yayinla:
     needs: topla
+    if: inputs.sadece == ''
     runs-on: ubuntu-latest
     environment:
       name: github-pages
